@@ -1,0 +1,18 @@
+/* styles/NewsItem.module.css */
+.newsItem {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  transition: box-shadow 0.3s ease;
+}
+
+.newsItem:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.newsLink {
+  font-size: 0.9em;
+  color: #555;
+  word-break: break-all; /* 長いURLを改行 */
+}
