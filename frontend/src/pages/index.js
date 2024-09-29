@@ -8,6 +8,8 @@ export default function Home() {
   const [question, setQuestion] = useState("");
   const [showNews, setShowNews] = useState(false);
   const [showQuestion, setShowQuestion] = useState(false);
+  const [selectedNews, setSelectedNews] = useState(null);
+  const [explanation, setExplanation] = useState("");
 
   // 今日の問いを取得する関数
   const fetchQuestion = () => {
@@ -51,6 +53,42 @@ export default function Home() {
       });
   };
 
+  // ニュースを選択する関数
+  const selectNews = (newsItem) => {
+    setSelectedNews(newsItem);
+  };
+
+  // 解説を取得する関数
+  const fetchExplanation = async () => {
+    if (!selectedNews || !question) {
+      alert('解説を表示するにはニュースと問いを選択してください。');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/explanation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          news_title: selectedNews.title,
+          question: question,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch explanation');
+      }
+
+      const data = await response.json();
+      setExplanation(data.explanation || '解説を取得できませんでした。');
+    } catch (error) {
+      console.error('Error fetching explanation:', error);
+      setExplanation('解説を取得できませんでした。もう一度お試しください。');
+    }
+  };
+
   return (
     <div className={styles.container}>
       <h1>ITアイスブレイクアプリ</h1>
@@ -79,10 +117,28 @@ export default function Home() {
       {showNews && (
         <div className={`${styles.newsList} ${showNews ? styles.show : ''}`}>
           {news.map((item, index) => (
-            <div key={index} className={styles.newsItemContainer}>
+            <div 
+              key={index} 
+              className={`${styles.newsItemContainer} ${selectedNews === item ? styles.selectedNews : ''}`}
+              onClick={() => selectNews(item)}
+            >
               <NewsItem title={item.title} link={item.source.url} /> {/* source.url を link プロパティとして渡す */}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 解説ボタン */}
+      <div className={styles.explanationContainer}>
+        <button onClick={fetchExplanation} className={styles.button}>
+          解説
+        </button>
+      </div>
+
+      {/* 解説表示 */}
+      {explanation && (
+        <div className={styles.explanationBox}>
+          <p>{explanation}</p>
         </div>
       )}
     </div>
