@@ -5,6 +5,7 @@ import random
 from dotenv import load_dotenv
 from openai import OpenAI
 import os
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -23,11 +24,13 @@ client = OpenAI(api_key=openai_api_key)
 @app.route('/api/topic', methods=['GET'])
 def get_topic():
     topics = [
-    "このニュースは彼氏，彼女をどう幸せにするか？",
-    "このニュースは我々のビジネスにどんな機会をもたらすか？",
-    "このニュースは我々のビジネスにどんな脅威があるか？",
-    "このニュースによって、儲ける会社は？",
-    "このニュースによって、10年後生活はどう変わる？"
+    "このニュースは彼氏，彼女,家族をどう幸せにするか？",
+    "このニュースは、企業にとってどんな事業や経営上の課題を引き起こす可能性があるか？",
+    "このニュースによって、引き起こる企業のITに纏わる課題と今後必要とされるITの人材は？",
+    "このニュースによって、ビジネスチャンスが生まれる業界や会社は？なぜその業界や会社にビジネスチャンスが生まれるのか？",
+    "このニュースによって、10年後生活はどう変わる？",
+    "このニュースによって、企業が将来にむけて検討すべき経営アジェンダは？",
+    "このニュースは、副業やフリーランス領域の人材事業を運営している企業にとって、どんなビジネスチャンスになるか？"
 ]
 # ランダムに1つのテーマを選んで返す
     response = {
@@ -36,53 +39,55 @@ def get_topic():
     
     return jsonify(response)
 
-
-@app.route('/api/news', methods=['GET'])
-def get_news():
+def search_news(query, max_results=10):
     url = "https://gnews.io/api/v4/search"
-    query = (
-        '(テクノロジー OR デジタル OR IT OR AI OR データ OR クラウド OR '
-        '5G OR IoT OR ロボット OR 自動化 OR サイバーセキュリティ) AND '
-        '(企業 OR ビジネス OR 産業 OR 経済 OR 戦略 OR イノベーション)'
-    )
     params = {
         "q": query,
         "lang": "ja",
         "country": "jp",
-        "max": 100,  # 取得する記事数を増やす
-        "apikey": apikey
+        "max": max_results,
+        "apikey": "5ad2f3825f164bf8abdc54e5add5da14"
     }
-
+    
     response = requests.get(url, params=params)
-
-    try:
-        data = response.json()
-    except ValueError as e:
-        print("JSONDecodeError:", e)
-        return jsonify({"error": "Invalid JSON response from GNews API"}), 500
-
     if response.status_code == 200:
-        articles = data.get('articles', [])
-        # タイトルまたは説明文でフィルタリング
-        tech_related_keywords = [
-            'テクノロジー', 'デジタル', 'it', 'ai', 'データ', 'クラウド', '5g', 'iot', 
-            'ロボット', '自動化', 'サイバーセキュリティ', 'dx', 'デジタル化', 
-            'イノベーション', 'スマート', 'オンライン', 'リモート', 'デジタルトランスフォーメーション'
-        ]
-        filtered_articles = [
-            article for article in articles
-            if any(keyword in (article['title'] + ' ' + article['description']).lower() 
-                   for keyword in tech_related_keywords)
-        ]
-        
-        # 記事が見つからない場合のメッセージ
-        if not filtered_articles:
-            return jsonify({"message": "関連する記事が見つかりませんでした。"}), 404
-        
-        return jsonify(filtered_articles[:5])  # 最大5件に制限
+        return response.json().get('articles', [])
     else:
-        error = data.get('errors', 'Unknown error occurred')
-        return jsonify({"error": error}), response.status_code
+        print(f"Error: {response.status_code}, {response.text}")
+        return []
+
+@app.route('/api/news', methods=['GET'])
+def get_news():
+    search_strategies = [
+        "テクノロジー OR デジタル OR AI OR IoT",
+        "デジタルトランスフォーメーション OR DX OR イノベーション",
+        "ビジネス AND (AI OR クラウド OR データ)",
+        "企業 AND (デジタル化 OR 自動化)",
+        "産業 AND (テクノロジー OR IT)"
+    ]
+    
+    all_articles = []
+    for strategy in search_strategies:
+        articles = search_news(strategy, max_results=10)
+        all_articles.extend(articles)
+        if len(all_articles) >= 5:
+            break
+        time.sleep(1)  # APIリクエスト間に短い遅延を入れる
+    
+    # 重複を除去
+    unique_articles = list({article['url']: article for article in all_articles}.values())
+    
+    # 関連性でフィルタリング
+    relevant_keywords = ['デジタル', 'テクノロジー', 'AI', 'IoT', 'クラウド', 'データ', 'イノベーション', 'DX', '自動化']
+    filtered_articles = [
+        article for article in unique_articles
+        if any(keyword.lower() in (article['title'] + ' ' + article['description']).lower() for keyword in relevant_keywords)
+    ]
+    
+    if not filtered_articles:
+        return jsonify({"message": "関連する記事が見つかりませんでした。別のキーワードで試してみてください。"}), 404
+    
+    return jsonify(filtered_articles[:5])
     
 # ニュースと問いに基づいた解説を生成するエンドポイント
 @app.route('/api/explanation', methods=['POST'])
